@@ -1,0 +1,125 @@
+SELECT   a.server_id
+         ,b.worldlevel
+         ,c.union_count
+         ,avg(a.level)                                                      AS avg_level
+         ,avg(CAST(a.reserved_45 AS int))                                   AS avg_45
+            ,COUNT( DISTINCT CASE WHEN a.paid_user=1
+                                  THEN a.account
+                              END
+                   )                                 AS paid_user_cnt
+            ,COUNT( DISTINCT CASE WHEN a.paid_user=0
+                                  THEN a.account
+                              END
+                   )                                 AS not_paid_user_cnt
+            ,COUNT( DISTINCT CASE WHEN a.class=1
+                                  THEN a.account
+                              END
+                   )                                 AS class_1_cnt
+            ,COUNT( DISTINCT CASE WHEN a.class=2
+                                  THEN a.account
+                              END
+                   )                                 AS class_2_cnt
+            ,COUNT( DISTINCT CASE WHEN a.class=3
+                                  THEN a.account
+                              END
+                   )                                 AS class_3_cnt
+            ,COUNT( DISTINCT CASE WHEN a.class=4
+                                  THEN a.account
+                              END
+                   )                                 AS class_4_cnt
+            ,COUNT( DISTINCT CASE WHEN a.class=4
+                                  THEN a.account
+                              END
+                   )                                 AS class_4_cnt
+            ,COUNT( DISTINCT CASE WHEN vip between 11 and 14
+                                  THEN a.account
+                              END
+                   )                                 AS extreme_r_cnt
+            ,COUNT( DISTINCT CASE WHEN vip between 9 and 10
+                                  THEN a.account
+                              END
+                   )                                 AS big_r_cnt
+            ,COUNT( DISTINCT CASE WHEN vip between 5 and 8
+                                  THEN a.account
+                              END
+                   )                                 AS middle_r_cnt
+            ,COUNT( DISTINCT CASE WHEN vip between 1 and 4
+                                  THEN a.account
+                              END
+                   )                                 AS small_r_cnt
+            ,COUNT( DISTINCT CASE WHEN vip=0
+                                  THEN a.account
+                              END
+                   )                                 AS normal_r_cnt
+            ,COUNT( DISTINCT CASE WHEN level>750 
+                                  THEN a.account
+                              END
+                   )                                 AS high_level_player_cnt
+            ,COUNT( DISTINCT CASE WHEN level between 500 and 750
+                                  THEN a.account
+                              END
+                   )                                 AS middle_level_player_cnt
+            ,COUNT( DISTINCT CASE WHEN level<500
+                                  THEN a.account
+                              END
+                   )                                 AS small_level_player_cnt
+            ,d.trading_count
+            ,e.avg_online_time
+            ,f.opentime
+     FROM  dx_eco_log_raw.role_cache a
+left join  (
+               select   server_id
+                        ,MAX(worldlevel) AS  worldlevel
+                        ,MAX(ds)
+                 from   pri_dx_studio.tsjy_worldlevel
+                 where  ds>='20181006'
+                   and  ds<='20181106'
+             group by   server_id
+           ) b
+        ON   a.server_id=b.server_id
+left join  (
+               select   server_id
+                      ,count(distinct reserved_29) as union_count
+                 from   dx_eco_log_raw.union_res
+                 where  ds>='20181006'
+                   and  ds<='20181106'
+             group by   server_id
+          )c
+      ON   a.server_id=c.server_id
+left join  (
+               select   server_id
+                        ,sum(cast(reserved_31 as int)) as trading_count
+                 from   dx_eco_log_raw.exchange_log 
+                 where  reserved_29='1'
+                   and  ds>='20181006'
+                   and  ds<='20181106'
+             group by   server_id
+          )d
+      ON   a.server_id=d.server_id
+left join  (
+               select server_id
+                       ,sum(cast(reserved_28 as bigint)) as total_time
+                       ,count(distinct role_guid) as login_cnt
+                       ,sum(cast(reserved_28 as bigint))/count(distinct role_guid) as avg_online_time
+                 from dx_eco_log_raw.online_heart
+                 where ds<='20181124'
+                 and   ds>='20181024'
+                 and   gm_level=0
+              group by server_id
+          )e
+      ON  a.server_id=e.server_id
+left join  (
+               SELECT server_id
+       				  ,opentime
+				from  data_analyze_topresto.server_id
+				where game_id=147
+				and substr(cast(server_id as varchar),1,4)!='2221'
+				group by server_id,opentime
+		   )f
+      on  a.server_id=cast(f.server_id as varchar)
+    where  a.ds>='20181006'
+      and  a.ds<='20181106'
+      and  a.gm_level=0
+
+ group by  a.server_id,b.worldlevel,c.union_count,d.trading_count,e.avg_online_time,f.opentime
+ order by  a.server_id

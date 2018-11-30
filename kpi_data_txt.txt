@@ -1,0 +1,146 @@
+select a.server_id
+       ,a.ds
+       ,a."总登陆"
+       ,b."充值人数"
+       ,b."充值金额"
+       ,a."新登陆人数"
+       ,b."新用户充值人数"
+       ,b."新用户充值金额"
+       ,a."老用户登陆人数"
+       ,b."老用户充值人数"
+       ,b."老用户充值金额"
+       ,a."2-7日登陆人数"
+       ,b."2-7日充值人数"
+       ,b."2-7日充值金额"
+       ,a."8日以上登陆人数"
+       ,b."8日以上充值人数"
+       ,b."8日以上充值金额"
+
+from(
+      SELECT
+        ds
+        ,server_id
+        ,sum(total_login_cnt) as "总登陆"
+        ,sum(
+            CASE WHEN player_login_total_day > 0 THEN total_login_cnt ELSE 0 END
+                                                                                 ) as "老用户登陆人数"
+        ,sum(
+            CASE WHEN player_login_total_day = 0 THEN total_login_cnt ELSE 0 END
+                                                                                 ) as "新登陆人数"
+        ,sum(case when player_login_total_day between 1 and 6 then total_login_cnt else 0 end
+                                                                                 ) as "2-7日登陆人数"
+        ,sum(case when player_login_total_day >= 7 then total_login_cnt else 0 end 
+                                                                                 ) as "8日以上登陆人数"
+            FROM
+              (
+                SELECT
+                  ds
+                  ,server_id
+                  ,count(DISTINCT concat(account, server_id)) AS total_login_cnt
+                  ,date_diff(
+                    'day',
+                    cast(
+                      substr(cast(from_unixtime(reg_time) AS varchar), 1, 10) AS date
+                                                                                      ),
+                    cast(
+                      substr(cast(from_unixtime(TIMESTAMP) AS varchar), 1, 10) AS date
+                                                                                      )
+                                                      ) AS player_login_total_day
+                    FROM
+                      dx_eco_log_raw.account_login
+                    WHERE
+                      ds BETWEEN '20181120'
+                      AND '20181127'
+                      AND substr(server_id, 1, 4) <> '2221'
+                    GROUP BY
+                      ds,
+                      server_id,
+                      date_diff(
+                        'day',
+                        cast(
+                          substr(cast(from_unixtime(reg_time) AS varchar), 1, 10) AS date
+                                                                                         ),
+                        cast(
+                          substr(cast(from_unixtime(TIMESTAMP) AS varchar), 1, 10) AS date
+                                                                                         )
+                                                        )
+                   )
+GROUP BY
+  ds,
+  server_id
+)a
+
+
+left join (
+
+
+
+SELECT
+  ds,
+  server_id,
+  sum("充值金额") as "充值金额",
+  sum("充值人数") as "充值人数",
+  sum(
+    case when player_login_total_day = 0 then "充值金额" else 0 end
+  ) as "新用户充值金额",
+  sum(
+    case when player_login_total_day > 0 then "充值金额" else 0 end
+  ) as "老用户充值金额",
+  sum(
+    case when player_login_total_day = 0 then "充值人数" else 0 end
+  ) as "新用户充值人数",
+  sum(
+    case when player_login_total_day > 0 then "充值人数" else 0 end
+  ) as "老用户充值人数",
+  sum(
+    case when player_login_total_day between 1 and 6 then "充值人数" else 0 end
+  ) as "2-7日充值人数",
+  sum(
+    case when player_login_total_day between 1 and 6 then "充值金额" else 0 end
+  ) as "2-7日充值金额",
+  sum(
+    case when player_login_total_day >= 6 then "充值人数" else 0 end
+  ) as "8日以上充值人数",
+  sum(
+    case when player_login_total_day >= 6 then "充值金额" else 0 end
+  )as "8日以上充值金额"
+from
+  (
+    select
+      server_id,
+      ds,
+      sum(cast(reserved_29 as decimal)) as "充值金额",
+      count(DISTINCT concat(account, server_id)) as "充值人数",
+      date_diff(
+        'day',
+        cast(
+          substr(cast(from_unixtime(reg_time) AS varchar), 1, 10) AS date
+        ),
+        cast(
+          substr(cast(from_unixtime(TIMESTAMP) AS varchar), 1, 10) AS date
+        )
+      ) AS player_login_total_day
+    FROM
+      dx_eco_log_raw.recharge
+    where
+      ds BETWEEN '20181120'
+      and '20181127'
+      and reserved_32 = '0'
+    group by
+      server_id,
+      ds,
+      date_diff(
+        'day',
+        cast(
+          substr(cast(from_unixtime(reg_time) AS varchar), 1, 10) AS date
+        ),
+        cast(
+          substr(cast(from_unixtime(TIMESTAMP) AS varchar), 1, 10) AS date
+        )
+      ))
+    group by
+      ds,
+      server_id
+ )b
+on a.server_id=b.server_id and a.ds=b.ds
+order by server_id,ds
